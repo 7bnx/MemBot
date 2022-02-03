@@ -9,6 +9,5 @@ ReceiverOptions receiverOptions = new() { AllowedUpdates = { } };
 bot.StartReceiving(TelegramBotHandlers.UpdateAsync,
                    TelegramBotHandlers.ErrorAsync,
                    receiverOptions);
-MemStorageProxy storage = new();
 
 while (true) Thread.Sleep(1);

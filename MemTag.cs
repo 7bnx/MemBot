@@ -1,5 +1,4 @@
-﻿
-namespace MemBot
+﻿namespace MemBot
 {
 
   internal class MemTag : IEquatable<MemTag>
@@ -8,40 +7,42 @@ namespace MemBot
     public int Id { get; set; }
     public string Name { get; set; } = null!;
     public List<Mem> Mems { get; set; } = new();
-    public MemTag(string tag = "") => Name = tag.ToLower();
+    public MemTag(string tag = "") => Name = tag.Trim().ToLower();
 
     public MemTag() { }
-    public static bool IsStringHasTags(string str) => str?.IndexOf(Separator) == 0;
-    public static List<MemTag> ToList(string str)
-    {
-      return str.ToLower()
-                .Split(Separator, StringSplitOptions.RemoveEmptyEntries)
-                .Select(s => string.Join("", s.Trim()
-                .Where(c => char.IsLetterOrDigit(c))))
-                .Select(s => new MemTag(s))
-                .Distinct().ToList();
-    }
-    public static bool HasTag(string str) => str.Contains(Separator);
+
+    public static bool HasTags(string str) 
+      => str?.IndexOf(Separator) == 0 && str.Length >= 2;
+    
+    public static string[] ToTagArray(string str)
+      => str.ToLower()
+            .Split(Separator, StringSplitOptions.RemoveEmptyEntries)
+            .Select(s => string.Join("", s.Trim().Where(c => char.IsLetterOrDigit(c))))
+            .Distinct().ToArray();
+    
+    public static MemTag[] ToArray(string str)
+      => ToTagArray(str).Select(s => new MemTag(s)).ToArray();
 
     public bool Equals(MemTag? other)
-    {
-      if (other is null) return false;
-      return Name == other.Name.ToLower();
-    }
+      => other is not null && Name == other.Name.ToLower();
+
+    public override string ToString()
+      => Separator + Name;
+
+    public override bool Equals(object? obj)
+      => Equals(obj as MemTag);
+
+    public override int GetHashCode()
+      => Name.GetHashCode();
   }
 
   class MemTagComparer : IEqualityComparer<MemTag>
   {
     public bool Equals(MemTag? x, MemTag? y)
-    {
-      if (x is null || y is null) return false;
-      return x.Name.ToLower() == y.Name;
-    }
+      => x is not null && y is not null && x!.Name == y!.Name;
 
     public int GetHashCode(MemTag obj)
-    {
-      return obj.Name.GetHashCode();
-    }
+      => obj.Name.GetHashCode();
   }
 
 }

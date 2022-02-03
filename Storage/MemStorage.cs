@@ -1,9 +1,10 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using LinqKit;
 
 namespace MemBot
 {
-  internal class MemStorage : IMemStorage
+  internal class MemStorage : MemStorageBase
   {
     private readonly DbContextOptions<EFApplicationContext> _options;
     public MemStorage(string connection = "DefaultConnection")
@@ -18,13 +19,15 @@ namespace MemBot
       var optionsBuilder = new DbContextOptionsBuilder<EFApplicationContext>();
       _options = optionsBuilder.UseSqlite(connectionString).Options;
     }
-    public async Task<bool> Add(Mem mem)
+    public async override Task<bool> Add(Mem mem)
     {
       using EFApplicationContext db = new(_options);
       string tagsString = string.Concat(mem.Tags.Select(t => t.Name));
 
-      var newTags = mem.Tags.Except(db.Tags, new MemTagComparer()).ToArray();
-      var foundMem = await db.Mems.FirstOrDefaultAsync(m => mem.Text.ToUpper() == m.Text.ToUpper());
+
+      var foundMem = await db.Mems.FirstOrDefaultAsync(m => mem.Text == m.Text);
+      var oldTags = await db.Tags.Where(t => tagsString.Contains(t.Name)).ToArrayAsync();
+      var newTags = mem.Tags.Except(oldTags, new MemTagComparer()).ToArray();
 
       if (foundMem is not null)
       {
@@ -34,19 +37,18 @@ namespace MemBot
       }
       else
       {
-        var oldTags = await db.Tags.Where(t => tagsString.Contains(t.Name)).ToArrayAsync();
-        //var oldTags = db.Tags.ToArray().Intersect(mem.Tags, new MemTagComparer()).ToArray();
         mem.Tags.Clear();
         mem.Tags.AddRange(newTags);
         mem.Tags.AddRange(oldTags);
         if (mem.Media.Count == 1)
         {
-          var sameFileExist = await mem.Media.First().IsExistAsync();
+          var (isExist, fileName) = await mem.Media.First().IsAlreadyExistAsync();
+          
           MemMedia foundMedia;
-          if (!sameFileExist.Item1 ||
-             (foundMedia = db.Media.ToArray().FirstOrDefault(m => m.Name == sameFileExist.Item2)!) is null)
+          if (!isExist ||
+             (foundMedia = db.Media.ToArray().FirstOrDefault(m => m.Name == fileName)!) is null)
           {
-            await mem.Media.First().Save();
+            mem.Media.First().Save();
             await db.Media.AddRangeAsync(mem.Media);
           }
           else mem.Media = new() { foundMedia };
@@ -61,23 +63,20 @@ namespace MemBot
       return true;
     }
 
-    public async Task<List<Mem>> Get(string tagsString)
+    public async override Task<IEnumerable<Mem>> GetAllMems(string tagsString)
     {
-      if (tagsString.Length < 2 || !MemTag.IsStringHasTags(tagsString)) return new();
-      return await Get(tagsString.Split(MemTag.Separator, StringSplitOptions.RemoveEmptyEntries));
+      if (!MemTag.HasTags(tagsString)) return new List<Mem>();
+      return await GetAllMems(tagsString.Split(MemTag.Separator, StringSplitOptions.RemoveEmptyEntries));
     }
 
-    public async Task<List<Mem>> Get(IEnumerable<string> tags)
+    public async override Task<IEnumerable<Mem>> GetAllMems(IEnumerable<string> tags)
     {
-      if (!tags.Any()) return new();
+      if (!tags.Any()) return new List<Mem>();
       using EFApplicationContext db = new(_options);
       
       IQueryable<Mem> memsDb = db.Mems.Include(m => m.Tags).Include(m => m.Media);
-      return await MemMatching.ByTagsCollectionFromDb(memsDb, tags);
+      return  await MemMatching.ByTagsCollectionFromDb(memsDb, tags);
 
-      //return ( db.Mems.Include(m => m.Tags).Include(m => m.Media))
-                // .Where(m => tags.Any(t => m.Tags.Contains(t)))
-                // .ToList();
       /*
       var r = mems.Select(m => new { Mem = m, Count = m.Tags.Count(t => tags.Contains(t)) })
                   .OrderByDescending(m => m.Count)
@@ -85,4 +84,7 @@ namespace MemBot
       */
     }
   }
+
+
+
 }

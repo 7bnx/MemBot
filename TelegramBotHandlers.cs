@@ -1,11 +1,9 @@
-using Telegram.Bot;
+п»їusing Telegram.Bot;
 using Telegram.Bot.Exceptions;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
-using Telegram.Bot.Types.InlineQueryResults;
 using Telegram.Bot.Types.InputFiles;
 using Telegram.Bot.Types.ReplyMarkups;
-
 
 namespace MemBot;
 
@@ -13,20 +11,23 @@ internal class TelegramBotHandlers
 {
   public static event Func<Mem, Task<bool>> OnAddMem = null!;
   private static readonly Dictionary<long, List<Message>> _messages = new();
-  private static readonly MemMediaBuilder _memMediaBuilder = new();
+  private static readonly MediaFactory _mediaFactory = new();
   private const string commandAdd = "/add";
   private const string commandAdded = "/added";
   private const string commandStart = "/start";
-  private const string welcomeText = "Привет!\n" +
-                                     "Это бот для хранения цитат, мемов, картинок, видео";
-  private const string enterTagsText = "Введите теги, использую символ '#'. Например:\n" +
-                                       "#фильм #цитата #юмор";
-  private const string loadMediaText = "Загрузите медиафайл: картинку, видео, аудио\n" +
-                                      $"Если файла нет, то введите команду {commandAdded}";
-  private const string addedMemCompleteText = "Мем добавлен";
-  private const string addNewMemText = "Введите фразу, цитату название мема";
+  private const string welcomeText = "РџСЂРёРІРµС‚!\n" +
+                                     "Р­С‚Рѕ Р±РѕС‚ РґР»СЏ С…СЂР°РЅРµРЅРёСЏ С†РёС‚Р°С‚, РјРµРјРѕРІ, РєР°СЂС‚РёРЅРѕРє, РІРёРґРµРѕ";
+  private const string enterTagsText = "Р’РІРµРґРёС‚Рµ С‚РµРіРё, РёСЃРїРѕР»СЊР·СѓСЋ СЃРёРјРІРѕР» '#'. РќР°РїСЂРёРјРµСЂ:\n" +
+                                       "#С„РёР»СЊРј #С†РёС‚Р°С‚Р° #СЋРјРѕСЂ";
+  private const string loadMediaText = "Р—Р°РіСЂСѓР·РёС‚Рµ РјРµРґРёР°С„Р°Р№Р»: РєР°СЂС‚РёРЅРєСѓ, РІРёРґРµРѕ, Р°СѓРґРёРѕ\n" +
+                                      $"Р•СЃР»Рё С„Р°Р№Р»Р° РЅРµС‚, С‚Рѕ РІРІРµРґРёС‚Рµ РєРѕРјР°РЅРґСѓ {commandAdded}";
+  private const string addedMemCompleteText = "РњРµРј РґРѕР±Р°РІР»РµРЅ";
+  private const string addNewMemText = "Р’РІРµРґРёС‚Рµ С„СЂР°Р·Сѓ, С†РёС‚Р°С‚Сѓ РЅР°Р·РІР°РЅРёРµ РјРµРјР°";
   private const string usageText = "Usage:\n" +
-                                  $"{commandAdd} - добавить мемчик\n";
+                                  $"{commandAdd} - РґРѕР±Р°РІРёС‚СЊ РјРµРјС‡РёРє\n";
+  private const string notFoundMemsText = "РњРµРјРѕРІ СЃ С‚Р°РєРёРјРё С‚РµРіР°РјРё РЅРµ РЅР°Р№РґРµРЅРѕ";
+
+  private static IMemStorage _storage = new MemStorageProxy();
   public static Task ErrorAsync(ITelegramBotClient botClient, Exception exception, CancellationToken cancellationToken)
   {
     var ErrorMessage = exception switch
@@ -50,8 +51,7 @@ internal class TelegramBotHandlers
     try
     {
       await handler;
-    }
-    catch (Exception exception)
+    } catch (Exception exception)
     {
       await ErrorAsync(botClient, exception, cancellationToken);
     }
@@ -96,19 +96,6 @@ internal class TelegramBotHandlers
       sentMessage = await MediaMessageHandler(botClient, message);
 
     Console.WriteLine($"The message was sent with id: {sentMessage.MessageId}");
-
-    static async Task<Message> SendFile(ITelegramBotClient botClient, Message message)
-    {
-      await botClient.SendChatActionAsync(message.Chat.Id, ChatAction.UploadPhoto);
-
-      const string filePath = @"Lol.jpg";
-      using FileStream fileStream = new(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
-      var fileName = filePath.Split(Path.DirectorySeparatorChar).Last();
-
-      return await botClient.SendDocumentAsync(chatId: message.Chat.Id,
-                                            new InputOnlineFile(fileStream, fileName),
-                                            caption: "Nice Picture");
-    }
   }
   static async Task<Message> WelcomeMessage(ITelegramBotClient botClient, Message message)
   {
@@ -121,7 +108,7 @@ internal class TelegramBotHandlers
     var chatId = message.Chat.Id;
     if (_messages.ContainsKey(chatId) && _messages[chatId][0].Text!.Contains(commandAdd))
     {
-      if(_messages[chatId].Count == 1)
+      if (_messages[chatId].Count == 1)
       {
         _messages[chatId].Add(message);
         return await SendTextMessageAsync(botClient, message, enterTagsText);
@@ -129,13 +116,23 @@ internal class TelegramBotHandlers
 
       if (_messages[chatId].Count == 2)
       {
-        if(MemTag.HasTag(message.Text!)) _messages[chatId].Add(message);
+        if (MemTag.HasTags(message.Text!)) _messages[chatId].Add(message);
         else return await SendTextMessageAsync(botClient, message, enterTagsText);
       }
 
       return await SendTextMessageAsync(botClient, message, loadMediaText);
     }
+    if (MemTag.HasTags(message.Text!)) return await GetMem(botClient, message);
     return await SendTextMessageAsync(botClient, message, usageText);
+  }
+
+  private static async Task<Message> GetMem(ITelegramBotClient botClient, Message message)
+  {
+    Mem mem = await _storage.GetMem(message.Text!);
+    if (mem?.Text is null || mem.Text == string.Empty)
+      return await SendTextMessageAsync(botClient, message, notFoundMemsText);
+    if (mem.Media.Count == 0) return await SendTextMessageAsync(botClient, message, mem.Text);
+    return await SendFile(botClient, message, mem);
   }
 
   private static async Task<Message> AddCommandHandler(ITelegramBotClient botClient, Message message)
@@ -154,15 +151,15 @@ internal class TelegramBotHandlers
     var chatId = message.Chat.Id;
     if (_messages.ContainsKey(chatId))
     {
-      var count = _messages[chatId].Count;
+      //var count = _messages[chatId].Count;
       var isFirstMessageAdd = _messages[chatId].First().Text!.Contains(commandAdd);
       var messages = _messages[chatId];
       _messages.Remove(chatId);
       if (messages.Count >= 3 && messages[2].Type == MessageType.Text && isFirstMessageAdd)
       {
         var mem = await BuildMem(botClient, messages);
-        var isAdded = await OnAddMem!.Invoke(mem);
-        return await SendTextMessageAsync(botClient, message, isAdded ? addedMemCompleteText : "Что-то не так");
+        var isAdded = await _storage.Add(mem);//OnAddMem!.Invoke(mem);
+        return await SendTextMessageAsync(botClient, message, isAdded ? addedMemCompleteText : "Р§С‚Рѕ-С‚Рѕ РЅРµ С‚Р°Рє");
       }
     }
     return await SendTextMessageAsync(botClient, message, usageText);
@@ -170,12 +167,12 @@ internal class TelegramBotHandlers
 
   private static async Task<Mem> BuildMem(ITelegramBotClient botClient, List<Message> messages)
   {
-    var listTags = MemTag.ToList(messages[2].Text!);
-    Mem mem = new() { Tags = listTags, Text = messages[1].Text! };
+    var arrayTags = MemTag.ToArray(messages[2].Text!);
+    Mem mem = new() { Tags = arrayTags.ToList(), Text = messages[1].Text! };
     if (messages.Count >= 4)
     {
       var media = await BuildMemMedia(botClient, messages[3]);
-      if(media != null) mem.Media.Add(media);
+      if (media != null) mem.Media.Add(media);
     }
     return mem;
   }
@@ -204,23 +201,47 @@ internal class TelegramBotHandlers
     var file = await botClient.GetFileAsync(fileId);
     using MemoryStream ms = new();
     await botClient.DownloadFileAsync(file.FilePath!, ms);
-    if(ms.Length == 0) return null!;
+    if (ms.Length == 0) return null!;
     string extension = "." + file!.FilePath!.Split('.')!.Last();
 
-    var media = _memMediaBuilder.Create(message.Type, extension);
+    var media = _mediaFactory.Create(extension);
     media.Name = file!.FileId;
     media.Data = ms.ToArray();
-    //media.Data = await FileDownloader.FromUrl(GetFileUrl(file));
+    //////media.Data = await FileDownloader.FromUrl(GetFileUrl(file));
     media.Size = media.Data.Length;
     return media;
   }
 
   //private static string GetFileUrl(Telegram.Bot.Types.File file)
-    //=> @$"https://api.telegram.org/file/bot{BotToken}/{file.FilePath}";
+  //=> @$"https://api.telegram.org/file/bot{BotToken}/{file.FilePath}";
 
   private static Task UnknownUpdateHandlerAsync(ITelegramBotClient botClient, Update update)
   {
     Console.WriteLine($"Unknown update type: {update.Type}");
     return Task.CompletedTask;
+  }
+
+  static async Task<Message> SendFile(ITelegramBotClient botClient, Message message, Mem mem)
+  {
+    await botClient.SendChatActionAsync(message.Chat.Id, ChatAction.UploadDocument);
+    var filePath = mem.Media[0].GetPath();
+    var caption = mem.Text;
+    using FileStream fileStream = new(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+
+    return await (mem.Media[0].Type switch
+    {
+      MemMedia.Types.Image => botClient.SendPhotoAsync(chatId: message.Chat.Id,
+                                                       new InputOnlineFile(fileStream, filePath),
+                                                       caption: caption),
+      MemMedia.Types.Audio => botClient.SendAudioAsync(chatId: message.Chat.Id,
+                                                       new InputOnlineFile(fileStream, filePath),
+                                                       caption: caption),
+      MemMedia.Types.Video => botClient.SendVideoAsync(chatId: message.Chat.Id,
+                                                       new InputOnlineFile(fileStream, filePath),
+                                                       caption: caption),
+      _ => botClient.SendDocumentAsync(chatId: message.Chat.Id,
+                                                       new InputOnlineFile(fileStream, filePath),
+                                                       caption: caption),
+    });
   }
 }
