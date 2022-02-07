@@ -1,11 +1,11 @@
 ﻿namespace MemBot
 {
-  internal class Mem : IEquatable<Mem>
+  public class Mem : IEquatable<Mem>
   {
     public int Id { get; set; }
     public string Text { get; set; } = null!;
-    public List<MemTag> Tags { get; set; } = new();
-    public List<MemMedia> Media { get; set; } = new();
+    public List<Tag> Tags { get; set; } = new();
+    public List<Media> Media { get; set; } = new();
     public DateTime CreateTime { get; set; } = DateTime.Now;
 
     public bool Equals(Mem? other)

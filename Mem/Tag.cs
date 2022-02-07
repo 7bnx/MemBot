@@ -1,15 +1,15 @@
 ﻿namespace MemBot
 {
 
-  internal class MemTag : IEquatable<MemTag>
+  public class Tag : IEquatable<Tag>
   {
     public const string Separator = "#";
     public int Id { get; set; }
     public string Name { get; set; } = null!;
     public List<Mem> Mems { get; set; } = new();
-    public MemTag(string tag = "") => Name = tag.Trim().ToLower();
+    public Tag(string tag = "") => Name = tag.Trim().ToLower();
 
-    public MemTag() { }
+    public Tag() { }
 
     public static bool HasTags(string str) 
       => str?.IndexOf(Separator) == 0 && str.Length >= 2;
@@ -20,28 +20,28 @@
             .Select(s => string.Join("", s.Trim().Where(c => char.IsLetterOrDigit(c))))
             .Distinct().ToArray();
     
-    public static MemTag[] ToArray(string str)
-      => ToTagArray(str).Select(s => new MemTag(s)).ToArray();
+    public static Tag[] ToArray(string str)
+      => ToTagArray(str).Select(s => new Tag(s)).ToArray();
 
-    public bool Equals(MemTag? other)
+    public bool Equals(Tag? other)
       => other is not null && Name == other.Name.ToLower();
 
     public override string ToString()
       => Separator + Name;
 
     public override bool Equals(object? obj)
-      => Equals(obj as MemTag);
+      => Equals(obj as Tag);
 
     public override int GetHashCode()
       => Name.GetHashCode();
   }
 
-  class MemTagComparer : IEqualityComparer<MemTag>
+  class MemTagComparer : IEqualityComparer<Tag>
   {
-    public bool Equals(MemTag? x, MemTag? y)
+    public bool Equals(Tag? x, Tag? y)
       => x is not null && y is not null && x!.Name == y!.Name;
 
-    public int GetHashCode(MemTag obj)
+    public int GetHashCode(Tag obj)
       => obj.Name.GetHashCode();
   }
 

@@ -1,6 +1,6 @@
 ﻿namespace MemBot
 {
-  internal class MemDocument : MemMedia
+  public class Document : Media
   {
     public override Types Type { get; init; } = Types.Document;
   }

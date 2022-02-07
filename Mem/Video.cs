@@ -1,6 +1,6 @@
 ﻿namespace MemBot
 {
-  internal class MemVideo : MemMedia
+  public class Video : Media
   {
     public override Types Type { get; init; } = Types.Video;
   }

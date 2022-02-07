@@ -1,13 +1,15 @@
 ﻿using MemBot;
-using Telegram.Bot;
-using Telegram.Bot.Extensions.Polling;
+using MemBot.Logger;
 
 const string botToken = "Enter bot token";
 
-TelegramBotClient bot = new(botToken);
-ReceiverOptions receiverOptions = new() { AllowedUpdates = { } };
-bot.StartReceiving(TelegramBotHandlers.UpdateAsync,
-                   TelegramBotHandlers.ErrorAsync,
-                   receiverOptions);
+Controller controller = new ControllerBuilder(new Controller())
+                            .SetBot(new TelegramBot(botToken))
+                            .SetStorage(new StorageProxy(new MemMatching()))
+                            .SetMediaFactory(new MediaFactory())
+                            .SetLogger(new LogConsole())
+                            .Build();
+                            
+controller.Start();
 
-while (true) Thread.Sleep(1);
+Console.ReadLine();

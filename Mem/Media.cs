@@ -2,9 +2,9 @@
 
 namespace MemBot
 {
-  internal abstract class MemMedia
+  public abstract class Media
   {
-    internal enum Types
+    public enum Types
     {
       Document,
       Audio,
@@ -14,9 +14,8 @@ namespace MemBot
 
     private const string _directory = "Media";
     private const string _dateFormatDirectory = "yyyy_MM_dd";
-    private string DirectoryPath {
-      get => Path.Combine(_directory, Type.ToString(), CreationTime.ToString(_dateFormatDirectory));
-    }
+    private string DirectoryPath
+      => System.IO.Path.Combine(_directory, Type.ToString(), CreationTime.ToString(_dateFormatDirectory));
     public int Id { get; set; }
     public string Name { get; set; } = null!;
     public string Extension { get; set; } = null!;
@@ -26,15 +25,15 @@ namespace MemBot
     public List<Mem> Mems { get; set; } = new();
     [NotMapped]
     public byte[] Data { get; set; } = null!;
-    public string GetPath() => Path.Combine(DirectoryPath, Name + Extension);
+    public string Path => System.IO.Path.Combine(DirectoryPath, Name + Extension);
 
-    public async Task<(bool isExist, string fileName)> IsAlreadyExistAsync()
+    public (bool isExist, string fileName) IsAlreadyExist()
     {
-      var directoryTypePath = Path.Combine(_directory, Type.ToString());
+      var directoryTypePath = System.IO.Path.Combine(_directory, Type.ToString());
       if (!Directory.Exists(directoryTypePath)) return (false, string.Empty);
       var filesPaths = Directory.GetFiles(directoryTypePath, "*.*", SearchOption.AllDirectories);
       var list = SameSizeExtension(filesPaths);
-      return await IsSameDataAsync(list);
+      return IsSameData(list);
     }
 
     private List<FileInfo> SameSizeExtension(string[] filesPaths)
@@ -49,27 +48,35 @@ namespace MemBot
       return list;
     }
 
-    private async Task<(bool isExist, string fileName)> IsSameDataAsync(List<FileInfo> files)
-    { 
-      foreach(var file in files)
-      {
-        using var fs = file.OpenRead();
+    private (bool isExist, string fileName) IsSameData(List<FileInfo> files)
+    {
+      bool isExist = false;
+      string fileName = string.Empty;
+      Parallel.ForEach(files, (file, state) => {
         byte[] readByte = new byte[2];
-        await fs.ReadAsync(readByte.AsMemory(0, 2));
-        if (readByte[0] == Data[0] && readByte[1] == Data[1]) 
-          return (isExist: true, fileName: file.Name.Split('.').First());
-      }
-      return (isExist:false, fileName: string.Empty);
+        using var fs = file.OpenRead();
+        fs.Read(readByte, 0, 2);
+        if (readByte[0] == Data[0] && readByte[1] == Data[1])
+        {
+          isExist = true;
+          fileName = file.Name.Split('.').First();
+          state.Stop();
+        }
+      });
+      return (isExist, fileName);
     }
 
-    public void Save()
+    public async Task Save()
     {
-      var task = Task.Run(() =>
-      {
-        if (!Directory.Exists(DirectoryPath)) 
+      try
+      { 
+        if (!Directory.Exists(DirectoryPath))
           Directory.CreateDirectory(DirectoryPath);
-        File.WriteAllBytes(GetPath(), Data);
-      });
+        await File.WriteAllBytesAsync(Path, Data);
+      }catch
+      {
+        throw;
+      }
     }
   }
 }
