@@ -53,7 +53,7 @@
         {
           foreach (var tag in mem.Tags)
           {
-            if (key.Contains(tag.Name) || tag.Name.Contains(key))
+            if (key.Contains(tag.Name))
             {
               _memsCache[key].Remove(mem);
               _memsCache[key].Add(mem);
