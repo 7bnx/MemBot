@@ -33,8 +33,12 @@ namespace MemBot
         var oldTags = await db.Tags.Where(t => tagsString.Contains(t.Name)).ToListAsync();
         var newTags = mem.Tags.Except(oldTags, new MemTagComparer()).ToList();
 
+        mem.Tags.Clear();
+        mem.Tags.AddRange(oldTags);
+        mem.Tags.AddRange(newTags);
+
         if (existedMem is not null)
-          await UpdateExistedMem(db, existedMem, mem, newTags);
+          await UpdateExistedMem(db, existedMem, mem);
         else
           await UpdateOrAddMemMedia(db, mem).ContinueWith(async (task) => await db.Mems.AddAsync(mem));
 
@@ -80,10 +84,10 @@ namespace MemBot
       }
     }
 
-    private static async Task UpdateExistedMem(EFApplicationContext db, Mem existedMem, Mem mem, List<Tag> newTags)
+    private static async Task UpdateExistedMem(EFApplicationContext db, Mem existedMem, Mem mem)
     {
       mem.Tags = mem.Tags.Except(existedMem.Tags).ToList();
-      existedMem.Tags.AddRange(newTags);
+      existedMem.Tags.AddRange(mem.Tags);
       if (existedMem.Media is null || existedMem.Media.Count == 0)
       {
         existedMem.Media = new() { mem.Media.First() };
