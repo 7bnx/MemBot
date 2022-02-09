@@ -28,7 +28,8 @@ namespace MemBot
       {
         string tagsString = string.Concat(mem.Tags.Select(t => t.Name));
 
-        var existedMem = await db.Mems.FirstOrDefaultAsync(m => mem.Text == m.Text);
+        var existedMem = await db.Mems.Include(m => m.Tags).Include(m => m.Media)
+                                 .FirstOrDefaultAsync(m => mem.Text == m.Text);
         var oldTags = await db.Tags.Where(t => tagsString.Contains(t.Name)).ToListAsync();
         var newTags = mem.Tags.Except(oldTags, new MemTagComparer()).ToList();
 

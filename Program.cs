@@ -9,7 +9,8 @@ Controller controller = new ControllerBuilder(new Controller())
                             .SetMediaFactory(new MediaFactory())
                             .SetLogger(new LogConsole())
                             .Build();
-                            
+
+
 controller.Start();
 
 Console.ReadLine();

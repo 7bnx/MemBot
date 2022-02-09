@@ -18,10 +18,6 @@ public class TelegramBot : IBot
   {
     _token = token;
     _bot = new(_token);
-    if (_bot.GetMeAsync().Result.IsBot)
-    {
-
-    }
   }
   public void Run()
   {
@@ -150,7 +146,6 @@ public class TelegramBot : IBot
   }
   private static Task UnknownUpdateHandlerAsync(Update update)
   {
-    Console.WriteLine($"Unknown update type: {update.Type}");
     return Task.CompletedTask;
   }
   public static Task ErrorAsync(ITelegramBotClient botClient, Exception exception, CancellationToken cancellationToken)
@@ -160,8 +155,6 @@ public class TelegramBot : IBot
       ApiRequestException apiRequestException => $"Telegram API Error:\n[{apiRequestException.ErrorCode}]\n{apiRequestException.Message}",
       _ => exception.ToString()
     };
-
-    Console.WriteLine(ErrorMessage);
     return Task.CompletedTask;
   }
 
