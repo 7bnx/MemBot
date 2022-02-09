@@ -88,22 +88,22 @@ namespace MemBot
     {
       mem.Tags = mem.Tags.Except(existedMem.Tags).ToList();
       existedMem.Tags.AddRange(mem.Tags);
-      if (existedMem.Media is null || existedMem.Media.Count == 0)
+      if (existedMem.Media?.Count == 0 && mem.Media?.Count == 1)
       {
         existedMem.Media = new() { mem.Media.FirstOrDefault()! };
         await UpdateOrAddMemMedia(db, existedMem);
       }
       mem.Tags = existedMem.Tags;
-      mem.Media = existedMem.Media;
+      mem.Media = existedMem.Media!;
       db.Update(existedMem);
     }
 
     private static async Task UpdateOrAddMemMedia(EFApplicationContext db, Mem mem)
     {
-      if (mem.Media is null || mem.Media.Count != 1) return;
+      if (mem.Media?.Count != 1) return;
       var (isExist, fileName) = mem.Media.First().IsAlreadyExist();
       Media foundMedia = db.Media.FirstOrDefault(m => m.Name == fileName)!;
-      if(isExist && foundMedia is not null && foundMedia.Id >= 1)
+      if(isExist && foundMedia?.Id >= 1)
       {
         mem.Media.Clear();
         mem.Media.Add(foundMedia);

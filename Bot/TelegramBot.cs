@@ -31,9 +31,8 @@ public class TelegramBot : IBot
   {
     if (mem is null) return Task.CompletedTask;
     if (mem.Media?.Count == 0 || mem.Media![0] is null)
-    {
       return Send(chat, mem!.Text);
-    }
+
     if (!IsChatAndMessageValid(chat, mem.Text, out long chatId)) return Task.CompletedTask;
     _bot.SendChatActionAsync(chatId, ChatAction.UploadDocument);
     var filePath = mem.Media![0].Path;
@@ -162,7 +161,7 @@ public class TelegramBot : IBot
   {
     if(string.IsNullOrEmpty(nameWithExtension)) return (fileName: string.Empty, extension: string.Empty);
     var arr = nameWithExtension.Split('.', StringSplitOptions.RemoveEmptyEntries);
-    if(arr == null || arr.Length != 2) return (fileName: string.Empty, extension: string.Empty);
+    if(arr.Length != 2) return (fileName: string.Empty, extension: string.Empty);
     return (fileName : arr[0], extension : arr[1]);
   }
 }
